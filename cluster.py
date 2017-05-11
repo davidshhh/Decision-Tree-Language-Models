@@ -68,7 +68,8 @@ def get_mutual_information(i, j, clusters, (f_unigram, f_bigram)):
 def aggl_cluster(f_unigram, f_bigram):
 	# clustres C_1, ..., C_n, init as L the 27 characters
 	clusters = [[chr(i)] for i in range(ord('a'), ord('z')+1)] + [[" "]]
- 
+ 	encodings = defaultdict(str)
+
 	# repeat clustering until all clusters are clustered into one
 	while len(clusters) > 1:
 		(max_i, max_j, max_mt) = (0, 0, -1)
@@ -81,6 +82,12 @@ def aggl_cluster(f_unigram, f_bigram):
 				if mt > max_mt:
 					(max_i, max_j, max_mt) = (i, j, mt)
 		
+		# update encodings
+		for l in clusters[max_i]:
+			encodings[l] = "0" + encodings[l]
+		for l in clusters[max_j]:
+			encodings[l] = "1" + encodings[l]
+
 		# merge the i and j clusters
 		merge = clusters[max_i] + clusters[max_j]
 		del clusters[max_i]
@@ -89,7 +96,14 @@ def aggl_cluster(f_unigram, f_bigram):
 
 		if len(clusters) == 2 or len(clusters) == 4:
 			print_clusters(clusters)
+		
 
+	# find the depth of Tree (K), and pad zeros in the least significant bits
+	K = max([len(e) for e in encodings.values()])
+	for l in encodings:
+		encodings[l] = encodings[l] + "0" * (K - len(encodings[l]))
+
+	return encodings
 
 def read_bigram(train_text):
 	# read bigram statistics from training text
@@ -116,10 +130,17 @@ def read_bigram(train_text):
 	return (f_unigram, f_bigram)
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("train_text", help="file name of training text")
-args = parser.parse_args()
+def main():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("train_text", help="file name of training text")
+	args = parser.parse_args()
 
-train_text = args.train_text
-(f_unigram, f_bigram) = read_bigram(train_text)
-aggl_cluster(f_unigram, f_bigram)
+	train_text = args.train_text
+	print train_text
+
+	(f_unigram, f_bigram) = read_bigram(train_text)
+	encodings = aggl_cluster(f_unigram, f_bigram)
+	return encodings
+
+if __name__ == '__main__':
+	main()
