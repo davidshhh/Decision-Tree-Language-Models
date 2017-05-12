@@ -10,10 +10,14 @@ def get_history_cond_prob(h1, h2, history, dev_bit_vectors):
 	return 0
 
 
-def get_mutual_information(question, node, history, dev_bigram, dev_bit_vectors):
+def get_mutual_information(question, node):
 	# new histories
 	(phi1, w1) = ([], 0)
 	(phi2, w2) = ([], 0)
+
+	# collect bigram statistics for the text at this node
+	prev = (0,)
+	bigram = defaultdict(int)
 
 	# split data by question of frontier
 	for (ch, bv) in node:
@@ -23,53 +27,51 @@ def get_mutual_information(question, node, history, dev_bigram, dev_bit_vectors)
 		else:
 			phi2.append((ch, bv))
 			w2 += 1
+		if len(prev) > 1:
+			bigram[(prev, (ch, bv))] += 1
+		prev = (ch, bv)
 
-	# normalize weights of new clusters
-	w1 = float(w1) / len(dev_bit_vectors)
-	w2 = float(w2) / len(dev_bit_vectors)
+	# normalize bigram of vectors to frequencies for p(w1, w2) calculation
+	total_bigram = sum(bigram.values())
+	bigram = defaultdict(float, {k : float(v) / total_bigram for k, v in bigram.iteritems()})
 
-	# locate frontier in history and create new history
-	new_history = deepcopy(history)
-	for i, (h, w) in enumerate(new_history):
-		if node == h:
-			del new_history[i]
+	# normalize weights of each split
+	w1 = float(w1) / len(node)
+	w2 = float(w2) / len(node)
 
-	new_history = new_history + [(phi1, w1), (phi2, w2)]
+	split = [(phi1, w1), (phi2, w2)]
 
-	# calculate mutual information
 	# setup look up tables for phi prob amd conditional phi prob
 	phi = {}
-	for i, (h, w) in enumerate(new_history):
+	for i, (h, w) in enumerate(split):
 		for (ch, bv) in h:
 			phi[(ch, bv)] = i
 
-	prob_phi = {i : w for i, (_, w) in enumerate(new_history)}
+	prob_phi = {i : w for i, (_, w) in enumerate(split)}
 	con_prob_phi = defaultdict(lambda : defaultdict(int))
 
+	# compute the entropy of the predicted letter for each permissible question
+	# based on the development data that reaches that node
 	prev = (0,)
-	for (w, bv) in dev_bit_vectors:
+	for (w, bv) in node:
 		if len(prev) > 1:
-			con_prob_phi[phi[prev]][phi[(w, bv)]] += 1
+			con_prob_phi[phi[prev]][(w, bv)] += 1
 		prev = (w, bv)
 
-	con_prob_phi = {w1 : {w2 : (float(count) / sum(w2_counts.values())) for w2, count in w2_counts.iteritems()} for w1, w2_counts in con_prob_phi.iteritems()}
+	con_prob_phi = {phi_w1 : {w2 : (float(count) / sum(w2_counts.values())) for w2, count in w2_counts.iteritems()} for phi_w1, w2_counts in con_prob_phi.iteritems()}
 
-	#print con_prob_phi
-	#print prob_phi
-
-	mt = 0.0
+	entropy = 0.0
 	prev = (0,)
 
 	visited = set()
-	for (w, bv) in dev_bit_vectors:
+	for (w, bv) in node:
 		if len(prev) > 1 and (prev, (w, bv)) not in visited:
 			visited.add((prev, (w, bv)))
-			#if log(con_prob_phi[phi[prev]][phi[(w, bv)]] / prob_phi[phi[(w, bv)]]) < 0:
-			#	print log(con_prob_phi[phi[prev]][phi[(w, bv)]] / prob_phi[phi[(w, bv)]])
-			mt += dev_bigram[(prev, (w, bv))] * log(con_prob_phi[phi[prev]][phi[(w, bv)]] / prob_phi[phi[(w, bv)]])
+			entropy += bigram[(prev, (w, bv))] * log(con_prob_phi[phi[prev]][(w, bv)], 2)
 		prev = (w, bv)
 
-	return (mt, new_history)
+	print entropy
+	return (entropy, split)
 
 def read_bit_vectors(encodings, text):
 	bit_vectors = []
@@ -88,16 +90,7 @@ def read_bit_vectors(encodings, text):
 				bit_vector += encodings[quadgram[i]]
 			bit_vectors.append((ch, bit_vector))
 
-			# store bigram count of encoding vector and letter
-			if (prev != ""):
-				bigram[(prev, (ch, bit_vector))] += 1
-			prev = (ch, bit_vector)
-
 			quadgram.pop(0)
-
-	# normalize bigram of vectors to frequencies for p(w1, w2) calculation
-	total_bigram = sum(bigram.values())
-	bigram = defaultdict(float, {k : float(v) / total_bigram for k, v in bigram.iteritems()})
 
 	return (bigram, bit_vectors)
 
@@ -125,16 +118,16 @@ def bit_encoding(encodings, train_text, f_bigram):
 
 		(node, qs) = frontiers.pop(0)
 		# maximize mutual information asked by question and choose the question as 'candidate'
-		(q_can, mt_can, h_can) = (-1, -1, [])
+		(q_can, mt_can, split_can) = (-1, -1, [])
 
 		# for each of the three questions, check mutual information and find 'candidate'
 		for q in range(len(qs)):
-			(mt, new_history) = get_mutual_information(qs[q], node, history, dev_bigram, dev_bit_vectors)
+			(mt, split) = get_mutual_information(qs[q], node)
 			if mt > mt_can:
-				(q_can, mt_can, h_can) = (q, mt, new_history)
+				(q_can, mt_can, split_can) = (q, mt, split)
 
 		# check the entropy reduction on the held out data by splitting this candidate
-		
+
 
 		# split node
 
