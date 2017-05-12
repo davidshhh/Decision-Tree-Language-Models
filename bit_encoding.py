@@ -59,16 +59,16 @@ def get_mutual_information(question, node, history, dev_bigram, dev_bit_vectors)
 
 	mt = 0.0
 	prev = (0,)
-	for (w, bv) in dev_bit_vectors:
-		if len(prev) > 1:
 
+	visited = set()
+	for (w, bv) in dev_bit_vectors:
+		if len(prev) > 1 and (prev, (w, bv)) not in visited:
+			visited.add((prev, (w, bv)))
 			#if log(con_prob_phi[phi[prev]][phi[(w, bv)]] / prob_phi[phi[(w, bv)]]) < 0:
 			#	print log(con_prob_phi[phi[prev]][phi[(w, bv)]] / prob_phi[phi[(w, bv)]])
 			mt += dev_bigram[(prev, (w, bv))] * log(con_prob_phi[phi[prev]][phi[(w, bv)]] / prob_phi[phi[(w, bv)]])
-			#print mt
 		prev = (w, bv)
 
-	print mt
 	return (mt, new_history)
 
 def read_bit_vectors(encodings, text):
@@ -95,13 +95,9 @@ def read_bit_vectors(encodings, text):
 
 			quadgram.pop(0)
 
-
 	# normalize bigram of vectors to frequencies for p(w1, w2) calculation
 	total_bigram = sum(bigram.values())
 	bigram = defaultdict(float, {k : float(v) / total_bigram for k, v in bigram.iteritems()})
-
-	#total_count = sum(bit_vectors.values())
-	#bit_vectors = {k: float(v) / total_count for k, v in bit_vectors.iteritems()}
 
 	return (bigram, bit_vectors)
 
@@ -129,16 +125,16 @@ def bit_encoding(encodings, train_text, f_bigram):
 
 		(node, qs) = frontiers.pop(0)
 		# maximize mutual information asked by question and choose the question as 'candidate'
-		q_can = -1
-		mt_can = -1
+		(q_can, mt_can, h_can) = (-1, -1, [])
 
 		# for each of the three questions, check mutual information and find 'candidate'
 		for q in range(len(qs)):
 			(mt, new_history) = get_mutual_information(qs[q], node, history, dev_bigram, dev_bit_vectors)
 			if mt > mt_can:
-				(q_can, mt_can) = (q, mt)
+				(q_can, mt_can, h_can) = (q, mt, new_history)
 
 		# check the entropy reduction on the held out data by splitting this candidate
+		
 
 		# split node
 
