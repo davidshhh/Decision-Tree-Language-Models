@@ -30,7 +30,7 @@ def get_bigramfreq(cluster_1, cluster_2, f_bigram):
 def get_mutual_information(i, j, clusters, (f_unigram, f_bigram)):
 	ij = [i, j]
 
-	mut_inf = 0.0
+	mt = 0.0
 	# first summation term
 	for k in range(len(clusters)):
 		for m in range(len(clusters)):
@@ -38,7 +38,7 @@ def get_mutual_information(i, j, clusters, (f_unigram, f_bigram)):
 				continue
 			f_km = get_bigramfreq(clusters[k], clusters[m], f_bigram)
 			if f_km:
-				mut_inf += f_km * log(f_km / (get_unigramfreq(clusters[k], f_unigram) * get_unigramfreq(clusters[m], f_unigram)))
+				mt += f_km * log(f_km / (get_unigramfreq(clusters[k], f_unigram) * get_unigramfreq(clusters[m], f_unigram)))
 
 	c_ij = clusters[i] + clusters[j]
 
@@ -48,7 +48,7 @@ def get_mutual_information(i, j, clusters, (f_unigram, f_bigram)):
 			continue
 		f_kij = get_bigramfreq(clusters[k], c_ij, f_bigram)
 		if f_kij:
-			mut_inf += f_kij * log(f_kij / (get_unigramfreq(clusters[k], f_unigram) * get_unigramfreq(c_ij, f_unigram)))
+			mt += f_kij * log(f_kij / (get_unigramfreq(clusters[k], f_unigram) * get_unigramfreq(c_ij, f_unigram)))
 
 	# third summation term
 	for m in range(len(clusters)):
@@ -56,14 +56,14 @@ def get_mutual_information(i, j, clusters, (f_unigram, f_bigram)):
 			continue
 		f_jim = get_bigramfreq(c_ij, clusters[m], f_bigram)
 		if f_jim:
-			mut_inf += f_jim * log(f_jim / (get_unigramfreq(c_ij, f_unigram) * get_unigramfreq(clusters[m], f_unigram)))
+			mt += f_jim * log(f_jim / (get_unigramfreq(c_ij, f_unigram) * get_unigramfreq(clusters[m], f_unigram)))
 
 	# fourth summation term
 	f_ijij = get_bigramfreq(c_ij, c_ij, f_bigram)
 	if f_ijij:
-		mut_inf += f_ijij * log(f_ijij / (get_unigramfreq(c_ij, f_unigram) * get_unigramfreq(c_ij, f_unigram)))
+		mt += f_ijij * log(f_ijij / (get_unigramfreq(c_ij, f_unigram) * get_unigramfreq(c_ij, f_unigram)))
 
-	return mut_inf
+	return mt
 
 def aggl_cluster(f_unigram, f_bigram):
 	# clustres C_1, ..., C_n, init as L the 27 characters
@@ -136,11 +136,12 @@ def main():
 	args = parser.parse_args()
 
 	train_text = args.train_text
-	print train_text
 
+	print "\nAgglomerative Clustering of the Vocabulary: "
+	print "--------------------------------------------"
 	(f_unigram, f_bigram) = read_bigram(train_text)
 	encodings = aggl_cluster(f_unigram, f_bigram)
-	return encodings
+	return (encodings, f_bigram)
 
 if __name__ == '__main__':
 	main()
